@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>打分系统</title>
+<style>
+body{max-width:400px;margin:30px auto;padding:0 20px;font-family:Arial}
+input,button{width:100%;margin:8px 0;padding:10px;font-size:16px}
+button{background:#007aff;color:white;border:none;border-radius:6px}
+</style>
+
+被打分人姓名：
+<input id="target" placeholder="请输入被打分人姓名">
+
+打分人姓名：
+<input id="user" placeholder="请输入你的姓名">
+
+分数（1-100整数）：
+<input id="score" placeholder="只能填整数，无小数点">
+
+<button onclick="submit()">提交</button>
+<div id="msg"></div>
+
+<button onclick="admin()" style="margin-top:30px;background:#666">查看统计</button>
+
+<script>
+let data = JSON.parse(localStorage.getItem('data') || '[]')
+
+function submit() {
+  const target = document.getElementById('target').value.trim()
+  const user = document.getElementById('user').value.trim()
+  const score = document.getElementById('score').value.trim()
+
+  if (!target || !user || !score) {
+    document.getElementById('msg').innerText = '请填写完整'
+    return
+  }
+
+  const num = parseInt(score)
+  if (isNaN(num) || num < 1 || num > 100) {
+    document.getElementById('msg').innerText = '请输入1-100整数'
+    return
+  }
+
+  // 防重复打分
+  const exist = data.some(item => item.target == target && item.user == user)
+  if (exist) {
+    document.getElementById('msg').innerText = '你已给该同学打过分'
+    return
+  }
+
+  data.push({ target, user, score: num })
+  localStorage.setItem('data', JSON.stringify(data))
+  document.getElementById('msg').innerText = '提交成功'
+  
+  // 清空输入框
+  document.getElementById('target').value = ''
+  document.getElementById('user').value = ''
+  document.getElementById('score').value = ''
+}
+
+function admin() {
+  const pwd = prompt('请输入管理密码：')
+  if (pwd !== '123456') return alert('密码错误')
+
+  const persons = {}
+  data.forEach(({ target, score }) => {
+    if (!persons[target]) persons[target] = []
+    persons[target].push(score)
+  })
+
+  let result = '===== 统计结果 =====\n'
+  for (let name in persons) {
+    const list = persons[name]
+    const total = list.reduce((a,b)=>a+b,0)
+    const avg = (total / list.length).toFixed(1)
+    result += `${name}：平均分 ${avg}\n`
+  }
+  alert(result || '暂无数据')
+}
+</script>
