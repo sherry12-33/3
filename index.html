@@ -1,36 +1,34 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
-<title>班级打分系统</title>
+<title>云端打分系统</title>
 <style>
-  body{max-width:450px;margin:30px auto;padding:0 20px;font-family:Arial}
-  input,button{width:100%;margin:8px 0;padding:10px;font-size:16px}
-  button{background:#007AFF;color:white;border:none;border-radius:8px}
-  .adminBtn{background:#666}
-  .delBtn{background:#FF3B30;padding:5px 10px;font-size:14px}
-  .item{padding:12px;border:1px solid #eee;border-radius:8px;margin:8px 0}
+body{max-width:450px;margin:30px auto;padding:0 20px;font-family:Arial}
+input,button{width:100%;margin:8px 0;padding:10px;font-size:16px}
+button{background:#007AFF;color:white;border:none;border-radius:8px}
+.admin{background:#666}
+.del{background:#ff3b30;padding:5px 10px;font-size:14px}
+.item{padding:12px;border:1px solid #eee;border-radius:8px;margin:8px 0}
 </style>
 
-被打分人：
-<input id="target" placeholder="输入被打分人姓名">
+被打分人姓名：
+<input id="target" placeholder="请输入">
 
-打分人：
-<input id="user" placeholder="输入你的姓名">
+打分人姓名：
+<input id="user" placeholder="请输入">
 
 分数（1-100）：
-<input id="score" placeholder="1-100整数">
+<input id="score" placeholder="请输入整数">
 
 <button onclick="submitScore()">提交打分</button>
 <p id="msg"></p>
 
-<button class="adminBtn" onclick="openAdmin()">管理员查看</button>
-<div id="adminArea"></div>
+<button class="admin" onclick="goAdmin()">管理员查看</button>
+<div id="adminView"></div>
 
 <script>
-// 免费云端JSON库（所有人共享数据）
-const API = "https://api.jsonbin.io/v3/b/666ac28cad19ca41ca3e4b31";
-const API_KEY = "$2b$10$9nH0mH4G7G3lV8t0eQjZoeQoG5t5G5e5e5e5e5e5e5e5e5e5e5e";
-
-let allData = [];
+// 免费云端全局数据库（所有人共用同一个）
+const cloudURL = "https://api.npoint.io/38f90e1759a2fbb1176c";
+let data = [];
 
 // 提交打分
 async function submitScore() {
@@ -45,20 +43,20 @@ async function submitScore() {
 
   const num = parseInt(score);
   if (isNaN(num) || num < 1 || num > 100) {
-    document.getElementById("msg").innerText = "请输入1-100整数";
+    document.getElementById("msg").innerText = "分数必须1-100";
     return;
   }
 
-  await loadData();
-  const exist = allData.some(item => item.target === target && item.user === user);
+  await loadCloud();
+
+  const exist = data.some(i => i.target === target && i.user === user);
   if (exist) {
-    document.getElementById("msg").innerText = "你已打过该同学";
+    document.getElementById("msg").innerText = "你已打过此同学";
     return;
   }
 
-  allData.push({ target, user, score: num });
-  await saveData(allData);
-
+  data.push({ target, user, score: num });
+  await saveCloud();
   document.getElementById("msg").innerText = "提交成功";
   document.getElementById("target").value = "";
   document.getElementById("user").value = "";
@@ -66,79 +64,73 @@ async function submitScore() {
 }
 
 // 管理员查看
-async function openAdmin() {
-  const pwd = prompt("请输入管理密码：");
+async function goAdmin() {
+  const pwd = prompt("密码：");
   if (pwd !== "123456") {
     alert("密码错误");
     return;
   }
-  await loadData();
+  await loadCloud();
   showAdmin();
 }
 
 // 显示管理界面
 function showAdmin() {
-  const area = document.getElementById("adminArea");
-  if (allData.length === 0) {
-    area.innerHTML = "<p>暂无打分记录</p>";
+  const area = document.getElementById("adminView");
+  if (data.length === 0) {
+    area.innerHTML = "暂无记录";
     return;
   }
 
-  let html = `<h3>总打分人数：${allData.length} 人</h3>`;
+  let html = `<h3>总打分人数：${data.length}</h3>`;
 
-  allData.forEach((item, index) => {
+  data.forEach((item, idx) => {
     html += `
     <div class="item">
       被打分：${item.target}<br>
       打分人：${item.user}<br>
       分数：${item.score}<br>
-      <button class="delBtn" onclick="delItem(${index})">删除此记录</button>
+      <button class="del" onclick="del(${idx})">删除</button>
     </div>`;
   });
 
-  // 统计平均分
-  const groups = {};
-  allData.forEach(({ target, score }) => {
-    if (!groups[target]) groups[target] = [];
-    groups[target].push(score);
+  // 平均分
+  const group = {};
+  data.forEach(({ target, score }) => {
+    if (!group[target]) group[target] = [];
+    group[target].push(score);
   });
 
-  html += "<h3>平均分统计</h3>";
-  for (let name in groups) {
-    const list = groups[name];
-    const avg = (list.reduce((a,b)=>a+b) / list.length).toFixed(1);
+  html += "<h3>平均分</h3>";
+  for (let name in group) {
+    const list = group[name];
+    const avg = (list.reduce((a, b) => a + b) / list.length).toFixed(1);
     html += `${name}：${avg} 分<br>`;
   }
 
   area.innerHTML = html;
 }
 
-// 删除记录
-async function delItem(index) {
+// 删除
+async function del(idx) {
   if (!confirm("确定删除？")) return;
-  allData.splice(index, 1);
-  await saveData(allData);
+  data.splice(idx, 1);
+  await saveCloud();
   alert("已删除");
   showAdmin();
 }
 
-// 读取云端数据
-async function loadData() {
-  const res = await fetch(API, {
-    headers: { "X-Master-Key": API_KEY }
-  });
-  const data = await res.json();
-  allData = data.record || [];
+// 读取云端
+async function loadCloud() {
+  const res = await fetch(cloudURL);
+  data = await res.json() || [];
 }
 
-// 保存到云端
-async function saveData(data) {
-  await fetch(API, {
+// 保存云端
+async function saveCloud() {
+  await fetch(cloudURL, {
     method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Master-Key": API_KEY
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data)
   });
 }
