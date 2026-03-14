@@ -1,114 +1,145 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
-<title>打分系统</title>
+<title>班级打分系统</title>
 <style>
-body{max-width:450px;margin:30px auto;padding:0 20px;font-family:Arial}
-input,button{width:100%;margin:8px 0;padding:10px;font-size:16px}
-button{background:#007aff;color:white;border:none;border-radius:6px}
-.del{background:#ff3b30;padding:6px 10px;font-size:14px}
-.list{margin:10px 0;padding:10px;border:1px solid #ddd;border-radius:6px}
+  body{max-width:450px;margin:30px auto;padding:0 20px;font-family:Arial}
+  input,button{width:100%;margin:8px 0;padding:10px;font-size:16px}
+  button{background:#007AFF;color:white;border:none;border-radius:8px}
+  .adminBtn{background:#666}
+  .delBtn{background:#FF3B30;padding:5px 10px;font-size:14px}
+  .item{padding:12px;border:1px solid #eee;border-radius:8px;margin:8px 0}
 </style>
 
-被打分人姓名：
-<input id="target" placeholder="请输入被打分人姓名">
+被打分人：
+<input id="target" placeholder="输入被打分人姓名">
 
-打分人姓名：
-<input id="user" placeholder="请输入你的姓名">
+打分人：
+<input id="user" placeholder="输入你的姓名">
 
-分数（1-100整数）：
-<input id="score" placeholder="只能填整数，无小数点">
+分数（1-100）：
+<input id="score" placeholder="1-100整数">
 
-<button onclick="submit()">提交</button>
-<div id="msg"></div>
+<button onclick="submitScore()">提交打分</button>
+<p id="msg"></p>
 
-<button onclick="admin()" style="margin-top:30px;background:#666">管理员查看</button>
-<div id="listArea"></div>
+<button class="adminBtn" onclick="openAdmin()">管理员查看</button>
+<div id="adminArea"></div>
 
 <script>
-let data = JSON.parse(localStorage.getItem('data') || '[]')
+// 免费云端JSON库（所有人共享数据）
+const API = "https://api.jsonbin.io/v3/b/666ac28cad19ca41ca3e4b31";
+const API_KEY = "$2b$10$9nH0mH4G7G3lV8t0eQjZoeQoG5t5G5e5e5e5e5e5e5e5e5e5e5e";
 
-function submit() {
-  const target = document.getElementById('target').value.trim()
-  const user = document.getElementById('user').value.trim()
-  const score = document.getElementById('score').value.trim()
+let allData = [];
+
+// 提交打分
+async function submitScore() {
+  const target = document.getElementById("target").value.trim();
+  const user = document.getElementById("user").value.trim();
+  const score = document.getElementById("score").value.trim();
 
   if (!target || !user || !score) {
-    document.getElementById('msg').innerText = '请填写完整'
-    return
+    document.getElementById("msg").innerText = "请填写完整";
+    return;
   }
 
-  const num = parseInt(score)
+  const num = parseInt(score);
   if (isNaN(num) || num < 1 || num > 100) {
-    document.getElementById('msg').innerText = '请输入1-100整数'
-    return
+    document.getElementById("msg").innerText = "请输入1-100整数";
+    return;
   }
 
-  const exist = data.some(item => item.target == target && item.user == user)
+  await loadData();
+  const exist = allData.some(item => item.target === target && item.user === user);
   if (exist) {
-    document.getElementById('msg').innerText = '你已给该同学打过分'
-    return
+    document.getElementById("msg").innerText = "你已打过该同学";
+    return;
   }
 
-  data.push({ target, user, score: num })
-  localStorage.setItem('data', JSON.stringify(data))
-  document.getElementById('msg').innerText = '提交成功'
-  
-  document.getElementById('target').value = ''
-  document.getElementById('user').value = ''
-  document.getElementById('score').value = ''
+  allData.push({ target, user, score: num });
+  await saveData(allData);
+
+  document.getElementById("msg").innerText = "提交成功";
+  document.getElementById("target").value = "";
+  document.getElementById("user").value = "";
+  document.getElementById("score").value = "";
 }
 
-function admin() {
-  const pwd = prompt('请输入管理密码：')
-  if (pwd !== '123456') {
-    alert('密码错误')
-    return
+// 管理员查看
+async function openAdmin() {
+  const pwd = prompt("请输入管理密码：");
+  if (pwd !== "123456") {
+    alert("密码错误");
+    return;
   }
-
-  showList()
+  await loadData();
+  showAdmin();
 }
 
-function showList() {
-  const area = document.getElementById('listArea')
-  if (data.length === 0) {
-    area.innerHTML = '暂无打分记录'
-    return
+// 显示管理界面
+function showAdmin() {
+  const area = document.getElementById("adminArea");
+  if (allData.length === 0) {
+    area.innerHTML = "<p>暂无打分记录</p>";
+    return;
   }
 
-  let html = `<h3>总打分人数：${data.length} 人</h3>`
+  let html = `<h3>总打分人数：${allData.length} 人</h3>`;
 
-  data.forEach((item, index) => {
+  allData.forEach((item, index) => {
     html += `
-    <div class="list">
-      被打分人：${item.target}<br>
+    <div class="item">
+      被打分：${item.target}<br>
       打分人：${item.user}<br>
       分数：${item.score}<br>
-      <button class="del" onclick="del(${index})">删除这条记录</button>
-    </div>`
-  })
+      <button class="delBtn" onclick="delItem(${index})">删除此记录</button>
+    </div>`;
+  });
 
-  const persons = {}
-  data.forEach(({ target, score }) => {
-    if (!persons[target]) persons[target] = []
-    persons[target].push(score)
-  })
+  // 统计平均分
+  const groups = {};
+  allData.forEach(({ target, score }) => {
+    if (!groups[target]) groups[target] = [];
+    groups[target].push(score);
+  });
 
-  html += `<h3>平均分统计：</h3>`
-  for (let name in persons) {
-    const list = persons[name]
-    const total = list.reduce((a,b)=>a+b,0)
-    const avg = (total / list.length).toFixed(1)
-    html += `${name}：${avg} 分<br>`
+  html += "<h3>平均分统计</h3>";
+  for (let name in groups) {
+    const list = groups[name];
+    const avg = (list.reduce((a,b)=>a+b) / list.length).toFixed(1);
+    html += `${name}：${avg} 分<br>`;
   }
 
-  area.innerHTML = html
+  area.innerHTML = html;
 }
 
-function del(index) {
-  if (!confirm('确定删除这条记录吗？')) return
-  data.splice(index, 1)
-  localStorage.setItem('data', JSON.stringify(data))
-  alert('已删除')
-  showList()
+// 删除记录
+async function delItem(index) {
+  if (!confirm("确定删除？")) return;
+  allData.splice(index, 1);
+  await saveData(allData);
+  alert("已删除");
+  showAdmin();
+}
+
+// 读取云端数据
+async function loadData() {
+  const res = await fetch(API, {
+    headers: { "X-Master-Key": API_KEY }
+  });
+  const data = await res.json();
+  allData = data.record || [];
+}
+
+// 保存到云端
+async function saveData(data) {
+  await fetch(API, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Master-Key": API_KEY
+    },
+    body: JSON.stringify(data)
+  });
 }
 </script>
